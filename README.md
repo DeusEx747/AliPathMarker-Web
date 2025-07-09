@@ -1,12 +1,112 @@
-# React + Vite
+# AliPathMarker-Web
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## 项目简介
 
-Currently, two official plugins are available:
+AliPathMarker-Web 是一个用于 Java 项目方法路径分析与标注的 Web 平台。用户可上传项目压缩包，输入目标方法的完全限定名，自动解析并展示方法源码，生成方法路径（以图片形式），支持路径勾选与标注，并可将方法源码与所选路径一键打包下载。适用于代码分析、路径标注、教学演示等场景。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## 主要功能
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **项目上传**：支持上传 `.zip`、`.rar`、`.7z`、`.tar`、`.gz` 等格式的 Java 项目压缩包。
+- **方法定位**：输入 Java 方法的完全限定名（如 `com.example.MyClass.myMethod`），自动定位并显示源码。
+- **路径生成**：一键生成目标方法的所有路径，路径以图片形式展示。
+- **路径勾选**：可多选路径图片，进行标注。
+- **结果打包下载**：将方法源码和所选路径图片打包为 ZIP 文件下载。
+- **历史分析结果**：分析后可在首页右侧查看并下载历史分析结果。
+- **重新分析/上传**：支持对同一项目重新分析或重新上传新项目。
+
+---
+
+## 使用说明
+
+1. **上传项目**
+
+   - 进入首页，点击“上传项目压缩包”，选择本地 Java 项目压缩包文件。
+   - 上传成功后，点击“进入分析页面”。
+
+2. **方法分析**
+
+   - 在分析页面左侧输入目标方法的完全限定名，点击“确认”。
+   - 系统自动显示该方法源码。
+   - 点击“路径分析”按钮，右侧生成并展示所有路径图片。
+
+3. **路径标注与保存**
+
+   - 在右侧路径图片列表中，勾选需要标注的路径。
+   - 点击“确认保存”，系统将所选路径图片与方法源码打包为 ZIP，自动跳转回首页并在右侧显示可下载列表。
+
+4. **下载与复用**
+   - 在首页右侧“可下载分析结果”列表中，点击“下载”获取分析结果。
+   - 可选择“重新分析”或“重新上传”进行新一轮分析。
+
+---
+
+## 目录结构
+
+```
+.
+├── public/
+│   └── ali-path-marker.svg      # 项目图标
+├── src/
+│   ├── App.jsx                 # 路由与主入口
+│   ├── main.jsx                # React 入口
+│   ├── pages/
+│   │   ├── UploadPage.jsx      # 上传与下载页面
+│   │   └── AnalysisPage.jsx    # 方法分析与路径标注页面
+│   └── assets/                 # 静态资源
+├── package.json
+├── vite.config.js
+├── README.md
+└── ...
+```
+
+---
+
+## 技术栈
+
+- 前端：React 18 + Vite
+- 路由：react-router-dom
+- UI：原生 CSS + Flex 布局
+- 后端（需配合）：推荐 Python Flask/FastAPI，负责文件上传、方法解析、路径图片生成、ZIP 打包与下载等
+
+---
+
+## 后端接口约定（示例）
+
+- `POST /api/upload`：上传项目压缩包，返回 sessionId
+- `POST /api/get-source`：输入方法限定名，返回源码文本
+- `POST /api/generate-paths`：生成路径，返回图片 URL 列表
+- `POST /api/package-and-download`：提交所选图片与方法名，返回 ZIP 文件流
+
+---
+
+## 本地开发与运行
+
+1. 安装依赖
+
+   ```bash
+   npm install
+   ```
+
+2. 启动开发服务器
+
+   ```bash
+   npm run dev
+   ```
+
+3. 打开浏览器访问 [http://localhost:5173](http://localhost:5173)
+
+---
+
+## 备注
+
+- 当前前端部分部分功能为模拟数据，需配合后端 API 实现完整业务流程。
+- 后端需支持跨域（CORS）。
+- 如需自定义路径图片样式或分析逻辑，请在后端实现相关算法与图片生成。
+
+---
+
+## 联系与贡献
+
+如有建议或需求，欢迎 issue 或 PR！
