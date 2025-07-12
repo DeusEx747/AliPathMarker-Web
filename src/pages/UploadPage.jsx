@@ -19,7 +19,6 @@ const mockDownloadList = [
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
-  const [uploaded, setUploaded] = useState(false);
   const [fileName, setFileName] = useState("");
   const [downloadList] = useState(mockDownloadList);
   const fileInputRef = useRef(null);
@@ -27,16 +26,37 @@ export default function UploadPage() {
   const location = useLocation();
   const fromAnalysis = location.state && location.state.fromAnalysis;
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setFileName(file.name);
     setUploading(true);
-    // 模拟上传
-    setTimeout(() => {
+    // 真正上传到后端
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("http://localhost:8000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      if (res.ok) {
+        // 新增：获取后端返回的 sessionId 和 fileTree
+        const data = await res.json();
+        if (data.sessionId && data.fileTree) {
+          navigate("/analysis", {
+            state: { sessionId: data.sessionId, fileTree: data.fileTree },
+          });
+        } else {
+          alert("上传成功，但未获取到文件树信息");
+        }
+      } else {
+        alert("上传失败，请检查后端服务或文件格式");
+      }
+    } catch (err) {
+      alert("上传出错：" + err.message);
+    } finally {
       setUploading(false);
-      setUploaded(true);
-    }, 1200);
+    }
   };
 
   const handleUploadClick = () => {
@@ -46,12 +66,7 @@ export default function UploadPage() {
     }
   };
 
-  const handleGoToAnalysis = () => {
-    navigate("/analysis");
-  };
-
   const handleReUpload = () => {
-    setUploaded(false);
     setFileName("");
     navigate("/", { replace: true });
   };
@@ -224,42 +239,32 @@ export default function UploadPage() {
     <div style={styles.container}>
       <div style={styles.diamondWrapper}>
         <div style={styles.diamond}>
-          {!uploaded ? (
-            <div style={styles.centerContent}>
-              <img
-                src="/ali-path-marker.svg"
-                alt="AliPathMarker 图标"
-                style={{ width: 72, height: 72, marginBottom: 18 }}
-              />
-              <div style={styles.title}>AliPathMarker</div>
-              <input
-                type="file"
-                accept={ACCEPTED_TYPES}
-                ref={fileInputRef}
-                style={{ display: "none" }}
-                onChange={handleFileChange}
-              />
-              <button
-                style={styles.uploadBtn}
-                onClick={handleUploadClick}
-                disabled={uploading}
-              >
-                {uploading ? "上传中..." : "上传项目压缩包"}
-              </button>
-              <div style={styles.tip}>支持 .zip, .rar, .7z, .tar, .gz</div>
-              {fileName && !uploading && (
-                <div style={styles.fileName}>已选择: {fileName}</div>
-              )}
-            </div>
-          ) : (
-            <div style={styles.centerContent}>
-              <div style={styles.successIcon}>✔</div>
-              <div style={styles.successText}>上传成功！</div>
-              <button style={styles.analysisBtn} onClick={handleGoToAnalysis}>
-                进入分析页面
-              </button>
-            </div>
-          )}
+          <div style={styles.centerContent}>
+            <img
+              src="/ali-path-marker.svg"
+              alt="AliPathMarker 图标"
+              style={{ width: 72, height: 72, marginBottom: 18 }}
+            />
+            <div style={styles.title}>AliPathMarker</div>
+            <input
+              type="file"
+              accept={ACCEPTED_TYPES}
+              ref={fileInputRef}
+              style={{ display: "none" }}
+              onChange={handleFileChange}
+            />
+            <button
+              style={styles.uploadBtn}
+              onClick={handleUploadClick}
+              disabled={uploading}
+            >
+              {uploading ? "上传中..." : "上传项目压缩包"}
+            </button>
+            <div style={styles.tip}>支持 .zip, .rar, .7z, .tar, .gz</div>
+            {fileName && !uploading && (
+              <div style={styles.fileName}>已选择: {fileName}</div>
+            )}
+          </div>
         </div>
       </div>
     </div>
