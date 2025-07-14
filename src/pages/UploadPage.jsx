@@ -1,50 +1,124 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-const ACCEPTED_TYPES = ".zip,.rar,.7z,.tar,.gz";
+// 后端服务URL
+// const BACKEND_URL = "http://localhost:8000";
 
-// 假数据：已分析zip包列表
-const mockDownloadList = [
-  {
-    name: "分析结果-20250709-1.zip",
-    url: "#",
-    time: "2025-07-09 21:30",
-  },
-  {
-    name: "分析结果-20250708-2.zip",
-    url: "#",
-    time: "2025-07-08 19:12",
-  },
-];
+const ACCEPTED_TYPES = ".zip,.rar,.7z,.tar,.gz";
 
 export default function UploadPage() {
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState("");
-  const [downloadList] = useState(mockDownloadList);
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const fromAnalysis = location.state && location.state.fromAnalysis;
+  // 新增：打包下载结果
+  const zipUrl = location.state?.zipUrl;
+  const zipName = location.state?.zipName;
+  // 从state中获取更多信息
+  const fromAnalysis = location.state?.fromAnalysis || false;
+  const receivedFileName = location.state?.fileName || "";
+  const receivedSessionId = location.state?.sessionId || "";
+
+  // 如果有接收到的文件名，使用它
+  useEffect(() => {
+    // 添加日志，检查收到的文件名
+    console.log("UploadPage接收到的状态:", {
+      receivedFileName,
+      receivedSessionId,
+      fromAnalysis,
+      zipUrl,
+      zipName,
+      currentFileName: fileName,
+      locationState: location.state,
+    });
+
+    // 确保设置有意义的文件名，而不是sessionId
+    if (receivedFileName) {
+      // 检查receivedFileName是否看起来像UUID/sessionId
+      const looksLikeSessionId =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          receivedFileName
+        );
+
+      if (looksLikeSessionId) {
+        // 如果看起来像sessionId，尝试使用更有意义的名称
+        if (location.state?.originalFileName) {
+          setFileName(location.state.originalFileName);
+        } else {
+          setFileName("上传的压缩包");
+        }
+      } else {
+        // 正常设置文件名
+        setFileName(receivedFileName);
+      }
+    }
+  }, [
+    receivedFileName,
+    fileName,
+    zipUrl,
+    zipName,
+    fromAnalysis,
+    receivedSessionId,
+    location.state,
+  ]);
+
+  // 重新分析按钮处理函数
+  const handleReAnalyze = () => {
+    if (receivedSessionId) {
+      // 获取可能存在的文件树数据
+      const savedFileTree = location.state?.fileTree;
+
+      navigate("/analysis", {
+        state: {
+          sessionId: receivedSessionId,
+          originalFileName: receivedFileName,
+          fileTree: savedFileTree, // 传递保存的文件树数据
+        },
+      });
+    }
+  };
+
+  // 重新上传按钮处理函数
+  const handleReUpload = () => {
+    setFileName("");
+    navigate("/", { replace: true });
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setFileName(file.name);
+
+    // 保存原始文件名
+    const originalFileName = file.name;
+    setFileName(originalFileName);
     setUploading(true);
+
     // 真正上传到后端
     const formData = new FormData();
     formData.append("file", file);
     try {
-      const res = await fetch("http://localhost:8000/api/upload", {
+      const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
       if (res.ok) {
         // 新增：获取后端返回的 sessionId 和 fileTree
         const data = await res.json();
+        console.log("[DEBUG] upload API 返回数据:", data);
+        console.log("[DEBUG] fileTree结构:", {
+          fileTree_type: typeof data.fileTree,
+          has_children: data.fileTree?.children?.length > 0,
+          children_count: data.fileTree?.children?.length || 0,
+          first_child: data.fileTree?.children?.[0] || null,
+        });
         if (data.sessionId && data.fileTree) {
           navigate("/analysis", {
-            state: { sessionId: data.sessionId, fileTree: data.fileTree },
+            state: {
+              sessionId: data.sessionId,
+              fileTree: data.fileTree,
+              originalFileName: originalFileName, // 传递原始文件名
+            },
           });
         } else {
           alert("上传成功，但未获取到文件树信息");
@@ -66,22 +140,14 @@ export default function UploadPage() {
     }
   };
 
-  const handleReUpload = () => {
-    setFileName("");
-    navigate("/", { replace: true });
-  };
-
-  const handleReAnalyze = () => {
-    navigate("/analysis");
-  };
-
   // 判断是否分析后返回
-  if (fromAnalysis) {
+  if (zipUrl) {
     return (
       <div
         style={{
           minHeight: "100vh",
           display: "flex",
+          flexDirection: "row",
           background: "linear-gradient(135deg, #f0f4ff 0%, #e0e7ff 100%)",
         }}
       >
@@ -95,6 +161,7 @@ export default function UploadPage() {
             justifyContent: "center",
             borderRight: "1px solid #e0e6ef",
             background: "none",
+            minHeight: "100vh",
           }}
         >
           <div
@@ -135,24 +202,49 @@ export default function UploadPage() {
           >
             {fileName ? fileName : "未选择压缩包"}
           </div>
-          <div style={{ marginTop: 12 }}>
-            <button style={styles.actionBtn} onClick={handleReAnalyze}>
-              重新分析
-            </button>
-            <button
-              style={{
-                ...styles.actionBtn,
-                marginLeft: 12,
-                background: "#e0e6ef",
-                color: "#4f8cff",
-              }}
-              onClick={handleReUpload}
-            >
-              重新上传
-            </button>
-          </div>
+          {/* 恢复重新分析和重新上传按钮 */}
+          {fromAnalysis && (
+            <div style={{ marginTop: 12 }}>
+              <button
+                style={{
+                  padding: "10px 22px",
+                  fontSize: 15,
+                  borderRadius: 7,
+                  border: "none",
+                  background: "#4f8cff",
+                  color: "white",
+                  cursor: "pointer",
+                  marginTop: 4,
+                  boxShadow: "0 2px 8px rgba(60,80,180,0.08)",
+                  transition: "background 0.2s",
+                }}
+                onClick={handleReAnalyze}
+                disabled={!receivedSessionId}
+              >
+                重新分析
+              </button>
+              <button
+                style={{
+                  padding: "10px 22px",
+                  fontSize: 15,
+                  borderRadius: 7,
+                  border: "none",
+                  marginLeft: 12,
+                  background: "#e0e6ef",
+                  color: "#4f8cff",
+                  cursor: "pointer",
+                  marginTop: 4,
+                  boxShadow: "0 2px 8px rgba(60,80,180,0.08)",
+                  transition: "background 0.2s",
+                }}
+                onClick={handleReUpload}
+              >
+                重新上传
+              </button>
+            </div>
+          )}
         </div>
-        {/* 右侧：可下载分析结果列表 */}
+        {/* 右侧：可下载分析结果 */}
         <div
           style={{
             flex: 1,
@@ -177,57 +269,35 @@ export default function UploadPage() {
               gap: 18,
             }}
           >
-            {downloadList.length === 0 ? (
-              <div style={{ color: "#888", fontSize: 16 }}>
-                暂无可下载分析结果
-              </div>
-            ) : (
-              downloadList.map((item, idx) => (
-                <div
-                  key={item.name}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 18,
-                    padding: "8px 0",
-                    borderBottom:
-                      idx !== downloadList.length - 1
-                        ? "1px solid #e0e6ef"
-                        : "none",
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 16, color: "#222" }}>
-                      {item.name}
-                    </div>
-                    <div style={{ fontSize: 13, color: "#888" }}>
-                      {item.time}
-                    </div>
-                  </div>
-                  <a
-                    href={item.url}
-                    download={item.name}
-                    style={{
-                      padding: "6px 18px",
-                      fontSize: 15,
-                      background: "#4f8cff",
-                      color: "#fff",
-                      borderRadius: 6,
-                      textDecoration: "none",
-                      marginLeft: 8,
-                    }}
-                    onClick={(e) => {
-                      if (item.url === "#") {
-                        e.preventDefault();
-                        alert("模拟下载：实际应由后端返回zip文件流");
-                      }
-                    }}
-                  >
-                    下载
-                  </a>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 18,
+                padding: "8px 0",
+              }}
+            >
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 16, color: "#222" }}>
+                  {zipName || "分析结果.zip"}
                 </div>
-              ))
-            )}
+              </div>
+              <a
+                href={zipUrl}
+                download={zipName || "分析结果.zip"}
+                style={{
+                  padding: "6px 18px",
+                  fontSize: 15,
+                  background: "#4f8cff",
+                  color: "#fff",
+                  borderRadius: 6,
+                  textDecoration: "none",
+                  marginLeft: 8,
+                }}
+              >
+                下载
+              </a>
+            </div>
           </div>
         </div>
       </div>
