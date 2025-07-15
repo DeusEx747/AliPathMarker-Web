@@ -1,304 +1,10 @@
-import React, {
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-} from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { Tree } from "react-arborist";
 import { useLocation, useNavigate } from "react-router-dom";
 import Prism from "prismjs";
 import "prismjs/themes/prism.css";
 import "prismjs/components/prism-java";
-
-// 增强的图片查看器组件，支持缩放、还原和拖动
-function ImageModal({ src, alt, onClose }) {
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const imgRef = useRef(null);
-
-  // 提取路径名，查找匹配的图片属性信息
-  const getImageStyle = useCallback(() => {
-    if (!window.analysisResultCache) return {};
-
-    // 处理主控流图
-    if (src.endsWith("output.png")) {
-      // 使用主控流图的尺寸信息
-      const cache = window.analysisResultCache;
-      if (cache.all_image_aspect_ratio) {
-        const ratio = parseFloat(cache.all_image_aspect_ratio);
-        return {
-          maxWidth: ratio > 2 ? "95%" : "90%",
-          maxHeight: ratio > 2 ? "80vh" : "90vh",
-          aspectRatio: `${cache.all_image_aspect_ratio}`,
-        };
-      } else {
-        return { maxWidth: "90%", maxHeight: "90vh" };
-      }
-    }
-
-    // 处理分路径图
-    const paths = window.analysisResultCache?.paths || [];
-    const matchingPath = paths.find((p) => src.endsWith(p.image_url));
-
-    if (matchingPath) {
-      const ratio = matchingPath.aspect_ratio
-        ? parseFloat(matchingPath.aspect_ratio)
-        : 1;
-      // 使用实际比例，但限制最大尺寸
-      return {
-        maxWidth: ratio > 2 ? "95%" : "90%",
-        maxHeight: ratio > 2 ? "80vh" : "90vh",
-        aspectRatio: matchingPath.aspect_ratio || "auto",
-      };
-    }
-
-    return { maxWidth: "90%", maxHeight: "90vh" };
-  }, [src]);
-
-  // 处理缩放
-  const handleZoom = useCallback((zoomIn) => {
-    setScale((prevScale) => {
-      const newScale = zoomIn
-        ? Math.min(prevScale * 1.2, 5) // 放大，最大5倍
-        : Math.max(prevScale / 1.2, 0.2); // 缩小，最小0.2倍
-      return newScale;
-    });
-  }, []);
-
-  // 重置缩放和位置
-  const handleReset = useCallback(() => {
-    setScale(1);
-    setPosition({ x: 0, y: 0 });
-  }, []);
-
-  // 处理拖动结束
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  // 处理拖动开始
-  const handleMouseDown = useCallback(
-    (e) => {
-      if (e.button === 0) {
-        // 左键点击
-        setIsDragging(true);
-        setDragStart({
-          x: e.clientX - position.x,
-          y: e.clientY - position.y,
-        });
-        e.preventDefault();
-      }
-    },
-    [position]
-  );
-
-  // 处理拖动中
-  const handleMouseMove = useCallback(
-    (e) => {
-      if (isDragging) {
-        setPosition({
-          x: e.clientX - dragStart.x,
-          y: e.clientY - dragStart.y,
-        });
-        e.preventDefault();
-      }
-    },
-    [isDragging, dragStart]
-  );
-
-  // 处理滚轮缩放
-  const handleWheel = useCallback((e) => {
-    e.preventDefault();
-    const delta = e.deltaY * -0.01;
-    setScale((prevScale) => {
-      const newScale = Math.max(0.2, Math.min(5, prevScale + delta));
-      return newScale;
-    });
-  }, []);
-
-  // 添加和移除全局事件监听
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "+" || e.key === "=") handleZoom(true);
-      if (e.key === "-") handleZoom(false);
-      if (e.key === "0") handleReset();
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("mouseup", handleMouseUp);
-
-    // 清理函数
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, [onClose, handleZoom, handleReset, handleMouseUp]);
-
-  // 计算图片样式
-  const imageStyle = useMemo(() => {
-    return {
-      ...getImageStyle(),
-      objectFit: "contain",
-      transform: `scale(${scale}) translate(${position.x / scale}px, ${
-        position.y / scale
-      }px)`,
-      transformOrigin: "center center",
-      cursor: isDragging ? "grabbing" : "grab",
-      transition: isDragging ? "none" : "transform 0.1s ease-out",
-    };
-  }, [getImageStyle, scale, position.x, position.y, isDragging]);
-
-  if (!src) return null;
-
-  return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.75)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        padding: 40,
-        cursor: isDragging ? "grabbing" : "default",
-      }}
-      onClick={onClose}
-      onMouseMove={handleMouseMove}
-      onWheel={handleWheel}
-    >
-      <div
-        style={{
-          position: "relative",
-          maxWidth: "95%",
-          maxHeight: "95%",
-          overflow: "hidden",
-          backgroundColor: "#fff",
-          padding: 10,
-          borderRadius: 8,
-          boxShadow: "0 5px 15px rgba(0,0,0,0.3)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          style={{
-            overflow: "hidden",
-            position: "relative",
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <img
-            ref={imgRef}
-            src={src}
-            alt={alt}
-            style={imageStyle}
-            onMouseDown={handleMouseDown}
-            draggable={false}
-          />
-        </div>
-
-        {/* 控制栏 */}
-        <div
-          style={{
-            position: "absolute",
-            bottom: 20,
-            left: "50%",
-            transform: "translateX(-50%)",
-            display: "flex",
-            gap: 15,
-            background: "rgba(0,0,0,0.6)",
-            padding: "8px 15px",
-            borderRadius: 20,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            title="缩小 (-)"
-            style={controlButtonStyle}
-            onClick={() => handleZoom(false)}
-          >
-            <span style={{ fontSize: 16 }}>－</span>
-          </button>
-          <div
-            style={{
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              fontSize: 14,
-              minWidth: 50,
-              justifyContent: "center",
-            }}
-          >
-            {Math.round(scale * 100)}%
-          </div>
-          <button
-            title="放大 (+)"
-            style={controlButtonStyle}
-            onClick={() => handleZoom(true)}
-          >
-            <span style={{ fontSize: 16 }}>＋</span>
-          </button>
-          <button
-            title="重置 (0)"
-            style={controlButtonStyle}
-            onClick={handleReset}
-          >
-            <span style={{ fontSize: 14 }}>重置</span>
-          </button>
-        </div>
-
-        <button
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            background: "rgba(255,255,255,0.8)",
-            border: "1px solid #ddd",
-            borderRadius: "50%",
-            width: 30,
-            height: 30,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            fontSize: 18,
-            boxShadow: "0 2px 5px rgba(0,0,0,0.2)",
-          }}
-          onClick={onClose}
-        >
-          ✕
-        </button>
-      </div>
-    </div>
-  );
-}
-
-// 控制按钮样式
-const controlButtonStyle = {
-  background: "rgba(255,255,255,0.2)",
-  border: "none",
-  borderRadius: 5,
-  width: 32,
-  height: 32,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-  color: "#fff",
-  fontWeight: "bold",
-};
+import ImageViewer from "../components/ImageViewer";
 
 // 拖拽分隔条组件
 function DragHandle({ onDrag, position = "right", onDoubleClick }) {
@@ -434,61 +140,26 @@ export default function AnalysisPage() {
   const [modalImage, setModalImage] = useState(null);
 
   // 新增: 三栏宽度状态
-  const [leftWidth, setLeftWidth] = useState(33.33); // 左侧栏宽度百分比
-  const [middleWidth, setMiddleWidth] = useState(33.33); // 中间栏宽度百分比
-  const [rightWidth, setRightWidth] = useState(33.34); // 右侧栏宽度百分比
+  const [leftWidth, setLeftWidth] = useState(50); // 左侧栏宽度百分比
+  const [rightWidth, setRightWidth] = useState(50); // 右侧栏宽度百分比
   const containerRef = useRef(null); // 容器ref，用于计算百分比
 
   // 处理左侧拖拽条拖动
-  const handleLeftDrag = useCallback(
-    (clientX) => {
-      if (!containerRef.current) return;
+  const handleDrag = useCallback((clientX) => {
+    if (!containerRef.current) return;
 
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const containerWidth = containerRect.width;
-      const leftPanelWidth = Math.max(
-        10,
-        Math.min(60, ((clientX - containerRect.left) / containerWidth) * 100)
-      );
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const containerWidth = containerRect.width;
+    const leftPanelWidth = Math.max(
+      20,
+      Math.min(80, ((clientX - containerRect.left) / containerWidth) * 100)
+    );
 
-      // 调整左侧和中间宽度，保持总宽度不变
-      const rightPanelWidth = rightWidth;
-      const middlePanelWidth = 100 - leftPanelWidth - rightPanelWidth;
+    // 调整左侧和右侧宽度，保持总宽度为100%
+    const rightPanelWidth = 100 - leftPanelWidth;
 
-      setLeftWidth(leftPanelWidth);
-      setMiddleWidth(middlePanelWidth);
-    },
-    [rightWidth]
-  );
-
-  // 处理中间拖拽条拖动
-  const handleMiddleDrag = useCallback(
-    (clientX) => {
-      if (!containerRef.current) return;
-
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const containerWidth = containerRect.width;
-      const leftRightPosition =
-        ((clientX - containerRect.left) / containerWidth) * 100;
-
-      // 中间拖拽条位置 = 左侧宽度 + 中间宽度
-      const newMiddleWidth = Math.max(
-        10,
-        Math.min(80, leftRightPosition - leftWidth)
-      );
-      const newRightWidth = 100 - leftWidth - newMiddleWidth;
-
-      setMiddleWidth(newMiddleWidth);
-      setRightWidth(newRightWidth);
-    },
-    [leftWidth]
-  );
-
-  // 双击拖拽条恢复默认宽度
-  const handleDoubleClick = useCallback(() => {
-    setLeftWidth(33.33);
-    setMiddleWidth(33.33);
-    setRightWidth(33.34);
+    setLeftWidth(leftPanelWidth);
+    setRightWidth(rightPanelWidth);
   }, []);
 
   // 拉取方法列表（传 filePath，避免闭包问题）
@@ -727,11 +398,18 @@ export default function AnalysisPage() {
   // 路径分析（重写，调用API，获取主控流图和分路径）
   const handleAnalyzePaths = async () => {
     setAnalyzing(true);
+    // 清空之前的分析结果和选择
     setAnalysisResult(null);
     setSelectedPaths([]);
+    // 记录时间戳用于图片防缓存
+    const analysisTimestamp = Date.now();
     try {
       const form = new URLSearchParams();
       form.append("sessionId", sessionId);
+      // 添加当前选中的文件和方法信息
+      if (selectedFile) form.append("filePath", selectedFile);
+      if (selectedMethod) form.append("methodName", selectedMethod);
+
       const res = await fetch("/api/analyze-paths", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -754,11 +432,25 @@ export default function AnalysisPage() {
 
       if (data.error) {
         alert("分析失败：" + data.error);
+        // 确保错误时也清空结果
+        setAnalysisResult(null);
       } else {
-        setAnalysisResult(data);
+        // 检查是否有路径数据
+        if (!data.paths || data.paths.length === 0) {
+          // 如果没有路径数据，设置一个带有提示的空结果
+          setAnalysisResult({
+            ...data,
+            paths: [],
+            noPathsFound: true,
+          });
+        } else {
+          setAnalysisResult({ ...data, timestamp: analysisTimestamp });
+        }
       }
     } catch (err) {
       alert("分析出错：" + err.message);
+      // 确保错误时也清空结果
+      setAnalysisResult(null);
     } finally {
       setAnalyzing(false);
     }
@@ -961,13 +653,13 @@ export default function AnalysisPage() {
     treeData = [addIdToTreeFixed(fileTree)];
   }
 
+  const closeModal = () => {
+    setModalImage(null);
+  };
+
   // 查看原图
   const handleViewImage = (url) => {
     setModalImage(url);
-  };
-
-  const closeModal = () => {
-    setModalImage(null);
   };
 
   // 文件树数据为空时提示
@@ -1214,150 +906,10 @@ export default function AnalysisPage() {
         </div>
 
         {/* 左侧拖拽条 */}
-        <DragHandle
-          onDrag={handleLeftDrag}
-          position="right"
-          onDoubleClick={handleDoubleClick}
-        />
+        <DragHandle onDrag={handleDrag} position="right" />
       </div>
 
-      {/* 中间：主控流图展示 */}
-      <div
-        style={{
-          width: `${middleWidth}%`,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-start",
-          padding: "48px 24px",
-          height: "100vh",
-          borderRight: "1px solid #e0e6ef",
-          overflowY: "auto",
-          overflowX: "hidden",
-          position: "relative", // 为拖拽条提供定位基准
-        }}
-      >
-        {/* 拖拽提示 - 放置在中间栏顶部 */}
-        <div
-          onClick={handleDoubleClick}
-          style={{
-            width: "100%",
-            textAlign: "center",
-            marginBottom: 16,
-            padding: "8px 12px",
-            borderRadius: 6,
-            background: "#f0f7ff",
-            border: "1px dashed #4f8cff",
-            color: "#4f8cff",
-            fontSize: 14,
-            fontWeight: 500,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            transition: "background-color 0.2s",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
-          }}
-          onMouseOver={(e) =>
-            (e.currentTarget.style.backgroundColor = "#e6f0ff")
-          }
-          onMouseOut={(e) =>
-            (e.currentTarget.style.backgroundColor = "#f0f7ff")
-          }
-          title="点击恢复默认宽度"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 16 16"
-            style={{ marginRight: 8 }}
-          >
-            <path
-              fill="#4f8cff"
-              d="M7 3H5a2 2 0 0 0-2 2v10h2V5h4V3H7zm6 0h-4v2h2v10h2V5a2 2 0 0 0 0-2z"
-            />
-          </svg>
-          可拖动边缘调整栏宽度，点击恢复默认
-        </div>
-
-        {!analysisResult && (
-          <div
-            style={{
-              color: "#888",
-              fontSize: 18,
-              marginBottom: 24,
-              width: "100%",
-              textAlign: "center",
-            }}
-          >
-            请先点击左下"路径分析"按钮获取主控流图
-          </div>
-        )}
-        {analysisResult && (
-          <>
-            <div
-              style={{
-                fontSize: 22,
-                fontWeight: 600,
-                marginBottom: 18,
-                width: "100%",
-                textAlign: "center",
-              }}
-            >
-              主控流图
-            </div>
-            <div
-              style={{
-                background: "#fafdff",
-                border: "1px solid #e0e6ef",
-                borderRadius: 12,
-                padding: 24,
-                width: "100%",
-                height: "calc(75vh - 48px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 18,
-                overflowY: "auto",
-                overflowX: "auto",
-                position: "relative",
-              }}
-            >
-              <img
-                src={"/" + analysisResult.all_image}
-                alt="主控流图"
-                style={{
-                  maxWidth: "100%",
-                  height: "auto",
-                  width:
-                    analysisResult.all_image_aspect_ratio > 2 ? "100%" : "85%",
-                  aspectRatio: analysisResult.all_image_aspect_ratio
-                    ? `${analysisResult.all_image_aspect_ratio}`
-                    : "auto",
-                  minHeight: analysisResult.all_image_height
-                    ? `${Math.min(
-                        analysisResult.all_image_height * 0.8,
-                        600
-                      )}px`
-                    : "auto",
-                  cursor: "pointer",
-                  borderRadius: 8,
-                }}
-                onClick={() => handleViewImage("/" + analysisResult.all_image)}
-              />
-            </div>
-          </>
-        )}
-
-        {/* 中间拖拽条 */}
-        <DragHandle
-          onDrag={handleMiddleDrag}
-          position="right"
-          onDoubleClick={handleDoubleClick}
-        />
-      </div>
-
-      {/* 右侧：分路径图片序列和勾选框 */}
+      {/* 右侧：路径分析 */}
       <div
         style={{
           width: `${rightWidth}%`,
@@ -1369,7 +921,7 @@ export default function AnalysisPage() {
           height: "100vh",
           position: "relative",
           overflowY: "auto",
-          overflowX: "hidden", // 防止水平溢出
+          overflowX: "hidden",
         }}
       >
         <div
@@ -1381,150 +933,213 @@ export default function AnalysisPage() {
             textAlign: "center",
           }}
         >
-          分路径选择
+          路径分析
         </div>
 
-        {/* 水平滚动容器 */}
+        {/* 主控流图链接 */}
+        {analysisResult && analysisResult.all_image && (
+          <a
+            href={"/" + analysisResult.all_image}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "center",
+              padding: "10px 16px",
+              marginBottom: 24,
+              background: "#4f8cff",
+              color: "#fff",
+              borderRadius: 8,
+              textDecoration: "none",
+              fontWeight: 500,
+              fontSize: 16,
+              boxShadow: "0 2px 8px rgba(79, 140, 255, 0.3)",
+              transition: "background 0.2s",
+            }}
+          >
+            查看主控流图
+          </a>
+        )}
+
+        {!analysisResult && (
+          <div
+            style={{
+              color: "#888",
+              fontSize: 18,
+              marginBottom: 24,
+              width: "100%",
+              textAlign: "center",
+            }}
+          >
+            请先点击左侧"路径分析"按钮获取分析结果
+          </div>
+        )}
+
+        {/* 横向滚动的分路径容器 */}
         <div
           style={{
             width: "100%",
-            overflowY: "auto",
-            overflowX: "hidden",
-            maxHeight: "calc(100vh - 220px)",
-            paddingBottom: 16,
-            marginBottom: 32,
+            overflowX: "auto",
+            overflowY: "hidden",
+            padding: 16,
+            margin: 32,
+            whiteSpace: "nowrap",
           }}
         >
-          {/* 水平排列的分路径图 */}
           <div
             style={{
               display: "flex",
-              flexDirection: "column",
+              flexDirection: "row",
               gap: 24,
-              paddingBottom: 16,
-              width: "100%",
+              minHeight: 360,
+              paddingBottom: 8,
             }}
           >
-            {analysisResult &&
-            analysisResult.paths &&
-            analysisResult.paths.length > 0 ? (
-              analysisResult.paths.map((item, idx) => {
-                const checked = selectedPaths.find(
-                  (p) =>
-                    p.png === item.image_url &&
-                    p.json === item.path_json &&
-                    p.dot === item.dot_file
-                );
+            {analysisResult ? (
+              analysisResult.paths && analysisResult.paths.length > 0 ? (
+                analysisResult.paths.map((item, idx) => {
+                  const checked = selectedPaths.find(
+                    (p) =>
+                      p.png === item.image_url &&
+                      p.json === item.path_json &&
+                      p.dot === item.dot_file
+                  );
 
-                // 计算合适的容器高度，基于路径长度和图片比例
-                const ratio = item.aspect_ratio
-                  ? parseFloat(item.aspect_ratio)
-                  : 1;
-                const pathLength = item.path_length || 5;
-                const containerHeight = Math.min(
-                  // 长路径给予更大高度，但有上限
-                  100 + pathLength * 40,
-                  // 很宽的图片需要更紧凑的容器
-                  ratio > 2 ? 400 : 600
-                );
-
-                // 根据栏宽计算图片宽度，当右侧栏过窄时，让图片占更多宽度
-                const imgWidthPercent =
-                  rightWidth < 25 ? 100 : ratio > 3 ? 100 : 90;
-
-                return (
-                  <div
-                    key={item.image_url}
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      background: "#fafdff",
-                      border: "1px solid #e0e6ef",
-                      borderRadius: 12,
-                      padding: rightWidth < 20 ? 10 : 18, // 根据宽度调整内边距
-                      boxShadow: checked ? "0 0 0 2px #4f8cff" : undefined,
-                      width: "100%",
-                      // 使用计算的高度
-                      minHeight: `${containerHeight}px`,
-                      position: "relative", // 相对定位
-                    }}
-                  >
-                    <img
-                      src={"/" + item.image_url}
-                      alt="分路径图"
-                      style={{
-                        width: `${imgWidthPercent}%`, // 根据栏宽动态调整
-                        height: "auto",
-                        maxHeight: "none",
-                        // 利用后端返回的长宽比信息
-                        aspectRatio: item.aspect_ratio
-                          ? `${item.aspect_ratio}`
-                          : "auto",
-                        // 根据路径长度和图片比例计算最小高度
-                        minHeight:
-                          Math.min(
-                            containerHeight - 80,
-                            ratio > 2 ? 320 : 500
-                          ) + "px",
-                        objectFit: "contain",
-                        cursor: "pointer",
-                        borderRadius: 6,
-                        marginBottom: 10,
-                      }}
-                      onClick={() => handleViewImage("/" + item.image_url)}
-                    />
-
-                    {/* 路径编号显示，移除尺寸信息 */}
+                  return (
                     <div
+                      key={item.image_url}
                       style={{
-                        fontSize: 13,
-                        color: "#666",
-                        marginBottom: 8,
-                        textAlign: "center",
-                        width: "100%",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        background: "#fafdff",
+                        border: "1px solid #e0e6ef",
+                        borderRadius: 12,
+                        boxShadow: checked ? "0 0 0 2px #4f8cff" : undefined,
+                        width: 400,
+                        minWidth: 400,
+                        maxWidth: 420,
+                        margin: "0 0",
+                        position: "relative",
+                        whiteSpace: "normal",
+                        padding: 24, // 增大内边距
                       }}
                     >
-                      路径 #{idx + 1}
-                    </div>
-
-                    {/* 菱形勾选框 */}
-                    <div
-                      style={{ cursor: "pointer", marginBottom: 4 }}
-                      onClick={() => handleSelectPath(idx)}
-                    >
-                      <svg width="32" height="32" viewBox="0 0 32 32">
-                        <polygon
-                          points="16,4 28,16 16,28 4,16"
-                          fill={checked ? "#4f8cff" : "#fff"}
-                          stroke="#4f8cff"
-                          strokeWidth="2"
+                      {/* 路径编号 */}
+                      <div
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 500,
+                          color: "#333",
+                          marginBottom: 10,
+                          width: "100%",
+                          textAlign: "center",
+                        }}
+                      >
+                        路径 #{idx + 1}
+                      </div>
+                      {/* 图片容器 */}
+                      <div
+                        style={{
+                          width: "100%",
+                          overflow: "visible",
+                          display: "flex",
+                          justifyContent: "center",
+                          margin: 12,
+                        }}
+                      >
+                        <img
+                          src={
+                            (item.image_url.startsWith("http")
+                              ? item.image_url
+                              : "/" + item.image_url) +
+                            "?t=" +
+                            (analysisResult?.timestamp || Date.now())
+                          }
+                          alt={`分路径图 #${idx + 1}`}
+                          style={{
+                            width: "100%", // 缩小图片宽度
+                            height: "auto",
+                            objectFit: "contain",
+                            cursor: "pointer",
+                            borderRadius: 6,
+                            display: "block",
+                            margin: "0 auto",
+                            background: "#fff",
+                          }}
+                          onClick={() =>
+                            handleViewImage(
+                              item.image_url.startsWith("http")
+                                ? item.image_url
+                                : "/" + item.image_url
+                            )
+                          }
                         />
-                        {checked && (
-                          <polyline
-                            points="11,16 15,22 22,10"
-                            fill="none"
-                            stroke="#fff"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                          />
-                        )}
-                      </svg>
+                      </div>
+                      {/* 勾选框放在图片下方，居中 */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          width: "100%",
+                          marginTop: 0,
+                        }}
+                      >
+                        <div
+                          style={{ cursor: "pointer" }}
+                          onClick={() => handleSelectPath(idx)}
+                        >
+                          <svg width="28" height="28" viewBox="0 0 32 32">
+                            <polygon
+                              points="16,4 28,16 16,28 4,16"
+                              fill={checked ? "#4f8cff" : "#fff"}
+                              stroke="#4f8cff"
+                              strokeWidth="2"
+                            />
+                            {checked && (
+                              <polyline
+                                points="11,16 15,22 22,10"
+                                fill="none"
+                                stroke="#fff"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                              />
+                            )}
+                          </svg>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
+                  );
+                })
+              ) : (
+                <div
+                  style={{
+                    color: "#888",
+                    fontSize: 16,
+                    textAlign: "center",
+                    minWidth: 320,
+                    padding: "30px 20px",
+                    background: "#f7f9fc",
+                    borderRadius: 8,
+                    border: "1px dashed #ccd6e6",
+                  }}
+                >
+                  {analysisResult.noPathsFound
+                    ? "当前方法没有分析出可行路径，请尝试选择其他方法"
+                    : "暂无分路径，请先点击分析按钮"}
+                </div>
+              )
             ) : (
               <div
                 style={{
                   color: "#888",
                   fontSize: 16,
                   textAlign: "center",
-                  width: "100%",
+                  minWidth: 320,
                 }}
-              >
-                暂无分路径，请先分析
-              </div>
+              ></div>
             )}
           </div>
         </div>
@@ -1559,7 +1174,7 @@ export default function AnalysisPage() {
 
       {/* 图片查看器模态框 */}
       {modalImage && (
-        <ImageModal src={modalImage} alt="查看大图" onClose={closeModal} />
+        <ImageViewer src={modalImage} alt="查看大图" onClose={closeModal} />
       )}
     </div>
   );
