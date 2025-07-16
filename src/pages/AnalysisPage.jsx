@@ -917,7 +917,7 @@ export default function AnalysisPage() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "flex-start",
-          padding: "48px 24px 24px 24px",
+          padding: "32px 24px 24px 24px", // 减少顶部内边距
           height: "100vh",
           position: "relative",
           overflowY: "auto",
@@ -928,7 +928,7 @@ export default function AnalysisPage() {
           style={{
             fontSize: 22,
             fontWeight: 600,
-            marginBottom: 18,
+            marginBottom: 16, // 减少下边距
             width: "100%",
             textAlign: "center",
           }}
@@ -946,8 +946,8 @@ export default function AnalysisPage() {
               display: "block",
               width: "100%",
               textAlign: "center",
-              padding: "10px 16px",
-              marginBottom: 24,
+              padding: "8px 16px", // 减少内边距
+              marginBottom: 20, // 减少下边距
               background: "#4f8cff",
               color: "#fff",
               borderRadius: 8,
@@ -967,7 +967,7 @@ export default function AnalysisPage() {
             style={{
               color: "#888",
               fontSize: 18,
-              marginBottom: 24,
+              marginBottom: 20, // 减少下边距
               width: "100%",
               textAlign: "center",
             }}
@@ -976,24 +976,31 @@ export default function AnalysisPage() {
           </div>
         )}
 
-        {/* 横向滚动的分路径容器 */}
+        {/* 分路径容器 - 水平排列但允许垂直滚动 */}
         <div
           style={{
             width: "100%",
             overflowX: "auto",
-            overflowY: "hidden",
+            overflowY: "auto", // 保留垂直滚动
             padding: 16,
-            margin: 32,
-            whiteSpace: "nowrap",
+            margin: "16px 0", // 减少上边距
+            height: "auto",
+            maxHeight: "calc(100vh - 180px)", // 增大最大高度，减少上下边距的限制
+            border: "1px solid #e0e6ef",
+            borderRadius: 8,
+            backgroundColor: "#f9fafc",
+            boxShadow: "inset 0 0 5px rgba(0,0,0,0.05)",
+            flex: 1, // 添加flex属性，使容器占据剩余空间
           }}
         >
           <div
             style={{
-              display: "flex",
-              flexDirection: "row",
+              display: "flex", // 恢复水平flex布局
+              flexDirection: "row", // 水平排列
               gap: 24,
-              minHeight: 360,
-              paddingBottom: 8,
+              padding: "12px 8px", // 增加内边距
+              minHeight: 400, // 增加最小高度
+              width: "max-content", // 确保容器宽度能容纳所有项目
             }}
           >
             {analysisResult ? (
@@ -1008,7 +1015,7 @@ export default function AnalysisPage() {
 
                   return (
                     <div
-                      key={item.image_url}
+                      key={`path-${idx}-${item.image_url || Date.now()}`} // 确保key值唯一
                       style={{
                         display: "flex",
                         flexDirection: "column",
@@ -1017,13 +1024,13 @@ export default function AnalysisPage() {
                         border: "1px solid #e0e6ef",
                         borderRadius: 12,
                         boxShadow: checked ? "0 0 0 2px #4f8cff" : undefined,
-                        width: 400,
+                        width: 400, // 恢复固定宽度
                         minWidth: 400,
                         maxWidth: 420,
-                        margin: "0 0",
+                        margin: "0",
                         position: "relative",
                         whiteSpace: "normal",
-                        padding: 24, // 增大内边距
+                        padding: 24,
                       }}
                     >
                       {/* 路径编号 */}
@@ -1032,7 +1039,7 @@ export default function AnalysisPage() {
                           fontSize: 15,
                           fontWeight: 500,
                           color: "#333",
-                          marginBottom: 10,
+                          marginBottom: 8, // 减小底部间距
                           width: "100%",
                           textAlign: "center",
                         }}
@@ -1047,6 +1054,7 @@ export default function AnalysisPage() {
                           display: "flex",
                           justifyContent: "center",
                           margin: 12,
+                          maxHeight: "none", // 确保不限制高度
                         }}
                       >
                         <img
@@ -1059,7 +1067,7 @@ export default function AnalysisPage() {
                           }
                           alt={`分路径图 #${idx + 1}`}
                           style={{
-                            width: "100%", // 缩小图片宽度
+                            width: "100%",
                             height: "auto",
                             objectFit: "contain",
                             cursor: "pointer",
@@ -1067,6 +1075,7 @@ export default function AnalysisPage() {
                             display: "block",
                             margin: "0 auto",
                             background: "#fff",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.1)", // 添加轻微阴影
                           }}
                           onClick={() =>
                             handleViewImage(
@@ -1084,14 +1093,26 @@ export default function AnalysisPage() {
                           justifyContent: "center",
                           alignItems: "center",
                           width: "100%",
-                          marginTop: 0,
+                          marginTop: 4, // 微调顶部间距
+                          marginBottom: "8px", // 调整底部间隔
                         }}
                       >
                         <div
-                          style={{ cursor: "pointer" }}
+                          style={{
+                            cursor: "pointer",
+                            padding: "5px", // 增加内边距，扩大点击区域
+                            borderRadius: "50%", // 添加圆形边框
+                            background: checked
+                              ? "rgba(79, 140, 255, 0.1)"
+                              : "transparent", // 选中时添加背景色
+                            transition: "all 0.2s", // 添加过渡效果
+                            transform: checked ? "scale(1.05)" : "scale(1)", // 选中时轻微放大
+                          }}
                           onClick={() => handleSelectPath(idx)}
                         >
-                          <svg width="28" height="28" viewBox="0 0 32 32">
+                          <svg width="36" height="36" viewBox="0 0 32 32">
+                            {" "}
+                            {/* 增大SVG尺寸 */}
                             <polygon
                               points="16,4 28,16 16,28 4,16"
                               fill={checked ? "#4f8cff" : "#fff"}
@@ -1103,7 +1124,7 @@ export default function AnalysisPage() {
                                 points="11,16 15,22 22,10"
                                 fill="none"
                                 stroke="#fff"
-                                strokeWidth="2.5"
+                                strokeWidth="3" // 增加勾选标记的粗细
                                 strokeLinecap="round"
                               />
                             )}
@@ -1124,6 +1145,11 @@ export default function AnalysisPage() {
                     background: "#f7f9fc",
                     borderRadius: 8,
                     border: "1px dashed #ccd6e6",
+                    width: 400, // 固定宽度与路径项保持一致
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: 200,
                   }}
                 >
                   {analysisResult.noPathsFound
@@ -1138,8 +1164,16 @@ export default function AnalysisPage() {
                   fontSize: 16,
                   textAlign: "center",
                   minWidth: 320,
+                  padding: "30px 20px",
+                  width: 400, // 固定宽度与路径项保持一致
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: 200,
                 }}
-              ></div>
+              >
+                请先点击分析按钮获取分路径结果
+              </div>
             )}
           </div>
         </div>
@@ -1157,13 +1191,14 @@ export default function AnalysisPage() {
               selectedPaths.length > 0 && !downloading
                 ? "pointer"
                 : "not-allowed",
-            marginTop: 32,
-            marginBottom: 32,
+            marginTop: 20, // 减少上边距
+            marginBottom: 20, // 减少下边距
             width: "90%",
             boxShadow: "0 2px 8px rgba(60,80,180,0.08)",
             transition: "background 0.2s",
             position: "sticky",
             bottom: 20,
+            zIndex: 10, // 确保按钮在滚动内容上方
           }}
           disabled={selectedPaths.length === 0 || downloading}
           onClick={handleConfirmSave}
