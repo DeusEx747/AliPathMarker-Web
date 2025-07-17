@@ -678,7 +678,7 @@ export default function AnalysisPage() {
         minHeight: "100vh",
         display: "flex",
         background: "#f8faff",
-        overflow: "hidden",
+        overflow: "auto",
         position: "relative", // 为拖拽条提供定位基准
       }}
     >
@@ -691,9 +691,7 @@ export default function AnalysisPage() {
           display: "flex",
           flexDirection: "column",
           gap: 32,
-          overflowY: "auto",
           overflowX: "hidden", // 防止水平溢出
-          height: "100vh",
           position: "relative", // 为拖拽条提供定位基准
         }}
       >
@@ -918,9 +916,7 @@ export default function AnalysisPage() {
           alignItems: "center",
           justifyContent: "flex-start",
           padding: "32px 24px 24px 24px", // 减少顶部内边距
-          height: "100vh",
           position: "relative",
-          overflowY: "auto",
           overflowX: "hidden",
         }}
       >
