@@ -144,6 +144,65 @@ export default function AnalysisPage() {
   const [rightWidth, setRightWidth] = useState(50); // 右侧栏宽度百分比
   const containerRef = useRef(null); // 容器ref，用于计算百分比
 
+  // 新增: 保存成功后的弹窗状态
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [packageInfo, setPackageInfo] = useState(null); // 保存打包信息
+
+  // 新增: 保存所有分析结果
+  const [analysisResults, setAnalysisResults] = useState([]);
+
+  // 新增: 从localStorage初始化分析结果
+  useEffect(() => {
+    // 从localStorage加载之前保存的分析结果
+    const savedResults = localStorage.getItem(`analysis_results_${sessionId}`);
+    if (savedResults) {
+      try {
+        const parsedResults = JSON.parse(savedResults);
+        if (Array.isArray(parsedResults) && parsedResults.length > 0) {
+          console.log(
+            `[DEBUG] 从localStorage加载了${parsedResults.length}个分析结果`
+          );
+          setAnalysisResults(parsedResults);
+        }
+      } catch (err) {
+        console.error("解析保存的分析结果出错:", err);
+      }
+    }
+
+    // 从上传页面传递的已有结果中恢复
+    if (
+      location.state?.previousResults &&
+      Array.isArray(location.state.previousResults)
+    ) {
+      console.log(
+        `[DEBUG] 从上传页面恢复了${location.state.previousResults.length}个分析结果`
+      );
+      setAnalysisResults((prevResults) => {
+        // 合并结果，避免重复
+        const mergedResults = [...prevResults];
+        location.state.previousResults.forEach((result) => {
+          if (!mergedResults.some((r) => r.zipUrl === result.zipUrl)) {
+            mergedResults.push(result);
+          }
+        });
+        return mergedResults;
+      });
+    }
+  }, [sessionId, location.state?.previousResults]);
+
+  // 新增: 保存分析结果到localStorage
+  useEffect(() => {
+    if (sessionId && analysisResults.length > 0) {
+      localStorage.setItem(
+        `analysis_results_${sessionId}`,
+        JSON.stringify(analysisResults)
+      );
+      console.log(
+        `[DEBUG] 保存了${analysisResults.length}个分析结果到localStorage`
+      );
+    }
+  }, [analysisResults, sessionId]);
+
   // 处理左侧拖拽条拖动
   const handleDrag = useCallback((clientX) => {
     if (!containerRef.current) return;
@@ -489,7 +548,7 @@ export default function AnalysisPage() {
     }
   };
 
-  // 确认保存（打包下载）
+  // 确认保存（打包下载）- 修改此函数
   const handleConfirmSave = async () => {
     if (!sessionId) return;
     setDownloading(true);
@@ -604,17 +663,40 @@ export default function AnalysisPage() {
         // 添加日志，查看最终使用的文件名
         console.log("[DEBUG] 最终使用的原始文件名:", originalFileName);
 
-        // 跳转时传递更完整的状态
-        navigate("/", {
-          state: {
-            zipUrl,
-            zipName,
-            fileName: originalFileName, // 传递原始文件名
-            fromAnalysis: true, // 标记来自分析页面
-            sessionId, // 传递会话ID，以支持重新分析
-            fileTree, // 传递文件树数据，以便重新分析时使用
-          },
-        });
+        // 创建新的分析结果对象，添加唯一标识和选择的路径信息
+        const timestamp = Date.now();
+        const uniqueId = `${selectedMethod}_${timestamp}`;
+        const pathsInfo = selectedPaths.map((p, idx) => ({
+          index: idx + 1,
+          png: p.png ? getRelativePath(p.png) : "",
+          json: p.json ? getRelativePath(p.json) : "",
+          dot: p.dot ? getRelativePath(p.dot) : "",
+        }));
+
+        const newResult = {
+          zipUrl,
+          zipName,
+          fileName: originalFileName,
+          fromAnalysis: true,
+          sessionId,
+          methodName: selectedMethod,
+          filePath: selectedFile,
+          timestamp,
+          uniqueId,
+          selectedPathsCount: selectedPaths.length,
+          pathsInfo,
+          analysisTime: new Date().toLocaleString(),
+        };
+
+        // 保存到分析结果列表，不再检查URL是否重复
+        setAnalysisResults((prev) => [...prev, newResult]);
+
+        // 保存打包信息，显示成功弹窗，而不是立即跳转
+        setPackageInfo(newResult);
+        setSaveSuccess(true);
+
+        // 清空选择的路径，以便用户可以继续选择其他路径
+        setSelectedPaths([]);
       } else if (data.error) {
         alert("打包失败：" + data.error);
       }
@@ -623,6 +705,32 @@ export default function AnalysisPage() {
     } finally {
       setDownloading(false);
     }
+  };
+
+  // 新增：前往下载页面，传递所有分析结果
+  const handleGoToDownload = () => {
+    if (analysisResults.length > 0) {
+      navigate("/", {
+        state: {
+          multipleResults: true,
+          results: analysisResults,
+          currentSession: {
+            sessionId,
+            fileTree,
+            fileName: location.state?.originalFileName || "上传的压缩包",
+          },
+        },
+      });
+    } else if (packageInfo) {
+      navigate("/", {
+        state: packageInfo,
+      });
+    }
+  };
+
+  // 新增：关闭成功提示
+  const handleCloseSaveSuccess = () => {
+    setSaveSuccess(false);
   };
 
   // 优化：根节点始终显示，且目录节点自动加 isDir: true
@@ -1167,9 +1275,7 @@ export default function AnalysisPage() {
                   justifyContent: "center",
                   minHeight: 200,
                 }}
-              >
-                请先点击分析按钮获取分路径结果
-              </div>
+              ></div>
             )}
           </div>
         </div>
@@ -1206,6 +1312,108 @@ export default function AnalysisPage() {
       {/* 图片查看器模态框 */}
       {modalImage && (
         <ImageViewer src={modalImage} alt="查看大图" onClose={closeModal} />
+      )}
+
+      {/* 新增：保存成功提示弹窗 */}
+      {saveSuccess && packageInfo && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: 12,
+              padding: 24,
+              width: "90%",
+              maxWidth: 500,
+              boxShadow: "0 4px 20px rgba(0, 0, 0, 0.15)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <div
+              style={{
+                fontSize: 22,
+                fontWeight: 600,
+                color: "#1bc47d",
+                marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <span style={{ marginRight: 8 }}>✓</span>
+              保存成功
+            </div>
+            <div
+              style={{
+                fontSize: 16,
+                color: "#333",
+                marginBottom: 24,
+                textAlign: "center",
+                lineHeight: 1.5,
+              }}
+            >
+              已成功保存
+              {packageInfo.filePath ? ` ${packageInfo.filePath} ` : ""}
+              {packageInfo.methodName
+                ? `中的 ${packageInfo.methodName} 方法`
+                : ""}
+              的分析结果
+            </div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                gap: 16,
+                width: "100%",
+              }}
+            >
+              <button
+                onClick={handleCloseSaveSuccess}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 16,
+                  borderRadius: 6,
+                  border: "1px solid #4f8cff",
+                  background: "#fff",
+                  color: "#4f8cff",
+                  cursor: "pointer",
+                  flex: 1,
+                }}
+              >
+                继续分析
+              </button>
+              <button
+                onClick={handleGoToDownload}
+                style={{
+                  padding: "10px 20px",
+                  fontSize: 16,
+                  borderRadius: 6,
+                  border: "none",
+                  background: "#4f8cff",
+                  color: "#fff",
+                  cursor: "pointer",
+                  flex: 1,
+                  boxShadow: "0 2px 8px rgba(79, 140, 255, 0.3)",
+                }}
+              >
+                前往下载
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
