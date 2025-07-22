@@ -502,12 +502,59 @@ export default function UploadPage() {
     const itemId = item.uniqueId || item.url;
     const isSelected = !!selectedDownloads[itemId];
 
+    // 处理路径信息显示 - 显示路径编号而不是文件路径
+    const renderPathsInfo = () => {
+      if (!item.pathsInfo || item.pathsInfo.length === 0) {
+        return null;
+      }
+
+      // 提取所有路径的索引号
+      const pathIndices = item.pathsInfo
+        .map((path) => path.index)
+        .filter(Boolean);
+
+      // 如果没有索引号，则使用数组索引+1作为路径编号
+      if (pathIndices.length === 0 && item.selectedPathsCount > 0) {
+        return (
+          <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
+            <div style={{ fontWeight: 500 }}>
+              选择了 {item.selectedPathsCount} 条路径
+            </div>
+          </div>
+        );
+      }
+
+      // 格式化路径编号显示
+      let pathsDisplay = "";
+
+      // 如果路径数量较少，直接显示所有编号
+      if (pathIndices.length <= 10) {
+        pathsDisplay = pathIndices.join(", ");
+      } else {
+        // 如果路径数量较多，显示前5个和后2个，中间用省略号
+        const firstPaths = pathIndices.slice(0, 5).join(", ");
+        const lastPaths = pathIndices.slice(-2).join(", ");
+        pathsDisplay = `${firstPaths}, ... , ${lastPaths}`;
+      }
+
+      return (
+        <div style={{ marginTop: 4, fontSize: 13, color: "#555" }}>
+          <div style={{ fontWeight: 500 }}>
+            选择了 {item.selectedPathsCount} 条路径:
+            <span style={{ fontWeight: "normal", marginLeft: 4 }}>
+              路径 {pathsDisplay}
+            </span>
+          </div>
+        </div>
+      );
+    };
+
     return (
       <div
         key={`download-${index}-${itemId}`}
         style={{
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start", // 改为顶部对齐，方便显示多行内容
           gap: 18,
           padding: "12px 16px",
           background: isSelected
@@ -520,7 +567,7 @@ export default function UploadPage() {
           transition: "all 0.2s",
         }}
       >
-        {/* 复选框 */}
+        {/* 复选框 - 调整为顶部对齐 */}
         <div
           onClick={() => handleSelectItem(itemId)}
           style={{
@@ -535,6 +582,7 @@ export default function UploadPage() {
             cursor: "pointer",
             transition: "all 0.2s",
             flexShrink: 0,
+            marginTop: 4, // 稍微向下调整，与文本对齐
           }}
         >
           {isSelected && (
@@ -563,12 +611,11 @@ export default function UploadPage() {
             {item.methodName ? ` - ${item.methodName}` : ""}
             {item.filePath ? ` (${item.filePath})` : ""}
           </div>
-          {item.selectedPathsCount > 0 && (
-            <div style={{ fontSize: 13, color: "#555", marginTop: 2 }}>
-              选择了 {item.selectedPathsCount} 条路径
-            </div>
-          )}
-          <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>
+
+          {/* 显示路径信息 */}
+          {renderPathsInfo()}
+
+          <div style={{ fontSize: 12, color: "#888", marginTop: 4 }}>
             分析时间: {item.analysisTime || item.addedTime}
           </div>
         </div>
@@ -584,6 +631,7 @@ export default function UploadPage() {
             textDecoration: "none",
             marginLeft: 8,
             flexShrink: 0,
+            alignSelf: "center", // 垂直居中
           }}
         >
           下载
