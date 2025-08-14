@@ -15,6 +15,7 @@ export default defineConfig({
     fs: {
       strict: false,
     },
+
     // 配置后端API代理，避免跨域并简化前端请求
     proxy: {
       "/api": {

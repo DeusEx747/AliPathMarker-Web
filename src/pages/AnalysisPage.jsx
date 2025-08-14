@@ -1080,6 +1080,60 @@ export default function AnalysisPage() {
           </div>
         )}
 
+        {analysisResult && (
+          <div
+            style={{
+              width: "100%",
+              marginBottom: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {Array.isArray(analysisResult.ranked_path_indices) &&
+              analysisResult.ranked_path_indices.length > 0 && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    background: "#fff",
+                    border: "1px solid #e0e6ef",
+                    borderRadius: 8,
+                    color: "#333",
+                    fontSize: 14,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, marginRight: 8 }}>
+                    路径排名（降序）:
+                  </span>
+                  <span>
+                    {analysisResult.ranked_path_indices
+                      .map((i) => (typeof i === "number" ? i + 1 : i))
+                      .join("、")}
+                  </span>
+                </div>
+              )}
+
+            {Array.isArray(analysisResult.key_variables) &&
+              analysisResult.key_variables.length > 0 && (
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    background: "#fff",
+                    border: "1px solid #e0e6ef",
+                    borderRadius: 8,
+                    color: "#333",
+                    fontSize: 14,
+                  }}
+                >
+                  <span style={{ fontWeight: 600, marginRight: 8 }}>
+                    关键变量:
+                  </span>
+                  <span>{analysisResult.key_variables.join("、")}</span>
+                </div>
+              )}
+          </div>
+        )}
+
         {/* 分路径容器 - 水平排列但允许垂直滚动 */}
         <div
           style={{
@@ -1116,6 +1170,15 @@ export default function AnalysisPage() {
                       p.json === item.path_json &&
                       p.dot === item.dot_file
                   );
+                  const ranked = Array.isArray(
+                    analysisResult.ranked_path_indices
+                  )
+                    ? analysisResult.ranked_path_indices
+                    : [];
+                  const isTop = ranked.slice(0, 5).includes(idx);
+                  const score = Array.isArray(analysisResult.path_scores)
+                    ? analysisResult.path_scores[idx]
+                    : undefined;
 
                   return (
                     <div
@@ -1149,7 +1212,19 @@ export default function AnalysisPage() {
                         }}
                       >
                         路径 #{idx + 1}
+                        {isTop ? "（关键）" : ""}
                       </div>
+                      {typeof score !== "undefined" && (
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: "#666",
+                            marginBottom: 6,
+                          }}
+                        >
+                          分数：{String(score)}
+                        </div>
+                      )}
                       {/* 图片容器 */}
                       <div
                         style={{
